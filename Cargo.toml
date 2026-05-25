@@ -1,0 +1,17 @@
+[package]
+name = "tool-error-classify"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.74"
+description = "Classify tool errors into a closed ErrorKind enum (USER_INPUT, AUTH, RATE_LIMITED, RETRYABLE, etc.) so agent loops can decide what to do next."
+authors = ["Mukunda Rao Katta <mukunda.vjcs6@gmail.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/MukundaKatta/tool-error-classify-rs"
+homepage = "https://github.com/MukundaKatta/tool-error-classify-rs"
+documentation = "https://docs.rs/tool-error-classify"
+readme = "README.md"
+keywords = ["llm", "agents", "error", "classification", "tool"]
+categories = ["api-bindings"]
+exclude = [".github/*", "target/*", "*.log"]
+
+[dev-dependencies]
