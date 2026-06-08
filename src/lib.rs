@@ -62,6 +62,21 @@ impl ErrorKind {
         }
     }
 
+    /// Whether retrying an error of this kind has any chance of succeeding.
+    ///
+    /// Returns `true` for [`RateLimited`](Self::RateLimited),
+    /// [`Timeout`](Self::Timeout), and [`Retryable`](Self::Retryable); `false`
+    /// for everything else.
+    ///
+    /// ```
+    /// use tool_error_classify::ErrorKind;
+    /// assert!(ErrorKind::RateLimited.is_retryable());
+    /// assert!(!ErrorKind::Auth.is_retryable());
+    /// ```
+    pub fn is_retryable(self) -> bool {
+        matches!(self, Self::RateLimited | Self::Timeout | Self::Retryable)
+    }
+
     pub fn default_hint(self) -> &'static str {
         match self {
             Self::UserInput => "Your tool arguments are invalid. Check the schema and try again.",
@@ -70,8 +85,12 @@ impl ErrorKind {
             Self::RateLimited => "You are being throttled. Wait before retrying.",
             Self::Timeout => "The request timed out. Try a smaller scope or wait.",
             Self::Retryable => "Transient error. Retry with backoff.",
-            Self::ExternalPermanent => "The external system rejected this request and will keep rejecting it.",
-            Self::Internal => "An internal error occurred. This is unlikely to be fixed by retrying.",
+            Self::ExternalPermanent => {
+                "The external system rejected this request and will keep rejecting it."
+            }
+            Self::Internal => {
+                "An internal error occurred. This is unlikely to be fixed by retrying."
+            }
             Self::Unknown => "An unclassified error occurred. Try once more, then give up.",
         }
     }
@@ -87,6 +106,7 @@ impl std::fmt::Display for ErrorKind {
 
 /// Result of `classify`.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ClassifiedError {
     pub kind: ErrorKind,
     pub hint: String,
@@ -95,11 +115,10 @@ pub struct ClassifiedError {
 }
 
 impl ClassifiedError {
+    /// Whether the agent loop should retry this error. Delegates to
+    /// [`ErrorKind::is_retryable`].
     pub fn is_retryable(&self) -> bool {
-        matches!(
-            self.kind,
-            ErrorKind::Retryable | ErrorKind::RateLimited | ErrorKind::Timeout
-        )
+        self.kind.is_retryable()
     }
 }
 
@@ -108,6 +127,8 @@ impl ClassifiedError {
 /// Input descriptor for `classify`. Build via `from_*` constructors or set
 /// fields directly.
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
 pub struct ErrorInfo {
     pub status_code: Option<u16>,
     pub type_name: Option<String>,
@@ -122,11 +143,17 @@ impl ErrorInfo {
     }
 
     pub fn from_status(code: u16) -> Self {
-        Self { status_code: Some(code), ..Default::default() }
+        Self {
+            status_code: Some(code),
+            ..Default::default()
+        }
     }
 
     pub fn from_type_name(name: impl Into<String>) -> Self {
-        Self { type_name: Some(name.into()), ..Default::default() }
+        Self {
+            type_name: Some(name.into()),
+            ..Default::default()
+        }
     }
 
     pub fn with_status(mut self, code: u16) -> Self {
@@ -324,12 +351,18 @@ mod tests {
 
     #[test]
     fn name_throttling() {
-        assert_eq!(classify_name("ThrottlingException").kind, ErrorKind::RateLimited);
+        assert_eq!(
+            classify_name("ThrottlingException").kind,
+            ErrorKind::RateLimited
+        );
     }
 
     #[test]
     fn name_timeout() {
-        assert_eq!(classify_name("RequestTimeoutError").kind, ErrorKind::Timeout);
+        assert_eq!(
+            classify_name("RequestTimeoutError").kind,
+            ErrorKind::Timeout
+        );
     }
 
     #[test]
@@ -349,12 +382,18 @@ mod tests {
 
     #[test]
     fn name_overloaded() {
-        assert_eq!(classify_name("ModelOverloadedException").kind, ErrorKind::Retryable);
+        assert_eq!(
+            classify_name("ModelOverloadedException").kind,
+            ErrorKind::Retryable
+        );
     }
 
     #[test]
     fn name_service_unavailable() {
-        assert_eq!(classify_name("ServiceUnavailableError").kind, ErrorKind::Retryable);
+        assert_eq!(
+            classify_name("ServiceUnavailableError").kind,
+            ErrorKind::Retryable
+        );
     }
 
     #[test]
@@ -364,7 +403,10 @@ mod tests {
 
     #[test]
     fn name_invalid_argument() {
-        assert_eq!(classify_name("InvalidArgumentException").kind, ErrorKind::UserInput);
+        assert_eq!(
+            classify_name("InvalidArgumentException").kind,
+            ErrorKind::UserInput
+        );
     }
 
     #[test]
